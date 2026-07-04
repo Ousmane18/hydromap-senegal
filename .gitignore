@@ -1,0 +1,21 @@
+# Python
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/.env
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env
+
+# Fichiers sensibles GEE — NE JAMAIS COMMITTER
+backend/gee-key.json
+*.json.key
+
+# Système
+.DS_Store
+Thumbs.db
+*.log

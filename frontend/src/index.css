@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+/* ─── Variables ─────────────────────────────── */
+:root {
+  --eau:     #0D9E74;
+  --eau-dk:  #085041;
+  --temp:    #EF9F27;
+  --sec:     #378ADD;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Scrollbar fine ────────────────────────── */
+::-webkit-scrollbar            { width: 4px; height: 4px; }
+::-webkit-scrollbar-track      { background: transparent; }
+::-webkit-scrollbar-thumb      { background: #d1d5db; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover{ background: #9ca3af; }
+
+/* ─── Leaflet tooltips ──────────────────────── */
+.leaflet-tooltip.hm-tip {
+  background: rgba(17,24,39,.93) !important;
+  border: none !important;
+  border-radius: 8px !important;
+  color: #f9fafb !important;
+  font-size: 12px !important;
+  font-family: inherit !important;
+  padding: 6px 10px !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3) !important;
+}
+.leaflet-tooltip.hm-tip::before { display: none !important; }
+
+/* ─── Leaflet popup ─────────────────────────── */
+.leaflet-popup-content-wrapper {
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12) !important;
+  border: 0.5px solid #e5e7eb !important;
+}
+.leaflet-popup-tip { display: none !important; }
+
+/* ─── Animations ────────────────────────────── */
+@keyframes fadeUp { from { opacity:0; transform:translateY(6px);} to { opacity:1; transform:none; } }
+@keyframes spin   { to { transform: rotate(360deg); } }
+@keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:.45} }
+
+.anim-fade  { animation: fadeUp .22s ease forwards; }
+.anim-spin  { animation: spin 1s linear infinite; }
+.anim-pulse { animation: pulse 2s ease infinite; }
+
+/* ─── Utilitaire glass ──────────────────────── */
+.glass {
+  background: rgba(255,255,255,.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}

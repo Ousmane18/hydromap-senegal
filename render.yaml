@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: hydromap-senegal-api
+    runtime: python
+    region: frankfurt           # Europe, plus proche du Sénégal
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GEE_PROJECT_ID
+        sync: false             # à remplir dans le dashboard Render
+      - key: GEE_SERVICE_ACCOUNT
+        sync: false
+      - key: GEE_KEY_FILE
+        value: gee-key.json
+      - key: PYTHON_VERSION
+        value: 3.11.0
