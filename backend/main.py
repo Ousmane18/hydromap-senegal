@@ -28,10 +28,25 @@ async def lifespan(app: FastAPI):
     print("="*50)
     try:
         import ee
+        import json
+        
+        # 1. Vérification si on est sur Render avec un Compte de Service
+        gee_creds = os.getenv("GEE_SERVICE_ACCOUNT_CREDENTIALS")
         pid = os.getenv("GEE_PROJECT_ID", "")
-        ee.Initialize(project=pid) if pid else ee.Initialize()
+        
+        if gee_creds:
+            print("Authentification GEE via Compte de Service...")
+            creds_dict = json.loads(gee_creds)
+            # Utilisation des identifiants du compte de service
+            credentials = ee.ServiceAccountCredentials(creds_dict["client_email"], key_data=gee_creds)
+            ee.Initialize(credentials=credentials, project=pid if pid else None)
+        else:
+            # 2. Authentification locale classique
+            print("Authentification GEE locale...")
+            ee.Initialize(project=pid) if pid else ee.Initialize()
+            
         _gee_ok = True
-        print("✓ GEE connecté")
+        print("✓ GEE connecté avec succès !")
     except Exception as e:
         print(f"⚠ GEE non connecté : {e}")
     print("✓ API prête : http://localhost:8000/api/docs")
