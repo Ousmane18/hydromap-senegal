@@ -67,14 +67,8 @@ app = FastAPI(
 # À remplacer dans backend/main.py
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "https://hydromap-senegal.vercel.app"
-    ],
-    allow_origin_regex=r"https://hydromap-senegal-.*\.vercel\.app", # Libère les sous-domaines Vercel
-    allow_credentials=True,
+    allow_origins=["*"],      # Autorise absolument toutes les URLs à interroger ton API
+    allow_credentials=False,  # Requis par la sécurité des navigateurs quand on utilise "*"
     allow_methods=["*"],
     allow_headers=["*"],
 )
