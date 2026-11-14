@@ -369,7 +369,12 @@ def pipeline_detection(
         raise ValueError(f"Méthode inconnue : {methode}")
 
     print(f"       ({time.time()-t3:.1f}s)")
-
+    
+    try:
+        from gee.metriques import evaluer_methode
+        metriques = evaluer_methode(carte_finale, get_zone(zone_nom))
+    except Exception as e:
+        print(f"  ⚠ Métriques non calculées : {e}")
     # 4. Vectorisation
     print("[4/5] Vectorisation (scale=50m)...")
     t4 = time.time()
@@ -392,6 +397,7 @@ def pipeline_detection(
         "zone":    zone_nom,
         "periode": f"{date_debut}/{date_fin}",
         "methode": methode_eff,
+        "metriques": metriques,
         "n_points_detectes": n_points,
         "duree_secondes": duree,
         "geojson": geojson,

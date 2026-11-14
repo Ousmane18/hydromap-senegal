@@ -25,6 +25,8 @@ const TipImportance = ({ active, payload }) => {
   )
 }
 
+const NC = "—"   // valeur affichée quand une métrique n'a pas pu être calculée
+
 export default function AnalysePage({ resultats }) {
 
   /* État vide */
@@ -38,7 +40,8 @@ export default function AnalysePage({ resultats }) {
     </div>
   )
 
-  const { n_points_detectes, statistiques, importance_variables, methode, periode, zone } = resultats
+  const { n_points_detectes, statistiques, importance_variables,
+          methode, periode, zone, metriques } = resultats
 
   /* Données graphiques */
   const dataRF = importance_variables && Object.keys(importance_variables).length
@@ -53,14 +56,10 @@ export default function AnalysePage({ resultats }) {
     { name:"Secondaires", value:statistiques.n_secondaires, fill:TYPES.secondaire.fill },
   ].filter(d=>d.value>0)
 
-  /* Matrice de confusion (tirerait de /api/validation en prod) */
-  const M   = { tn:141, fp:9, fn:6, tp:144 }
-  const tot = M.tn+M.fp+M.fn+M.tp
-  const oa  = +((M.tp+M.tn)/tot*100).toFixed(1)
-  const pr  = +(M.tp/(M.tp+M.fp)*100).toFixed(1)
-  const re  = +(M.tp/(M.tp+M.fn)*100).toFixed(1)
-  const f1  = +(2*pr*re/(pr+re)).toFixed(1)
-  const k   = +((2*(M.tp*M.tn-M.fn*M.fp))/((M.tp+M.fp)*(M.fp+M.tn)+(M.tp+M.fn)*(M.fn+M.tn))).toFixed(4)
+  /* Métriques RÉELLES renvoyées par le backend (null si non calculables) */
+  const m  = metriques || null
+  const M  = m?.matrice || null
+  const fmtPct = v => (v == null ? NC : `${v}%`)
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 p-5">
@@ -70,7 +69,7 @@ export default function AnalysePage({ resultats }) {
         <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-wrap
           items-start justify-between gap-4">
           <div>
-            <h1 className="text-lg font-bold text-gray-900">Analyse Random Forest</h1>
+            <h1 className="text-lg font-bold text-gray-900">Analyse — {methode}</h1>
             <p className="text-xs text-gray-400 mt-1">
               Zone : <span className="text-gray-600 font-medium">{zone}</span> ·
               Période : <span className="text-gray-600 font-medium">{periode}</span> ·
@@ -86,13 +85,28 @@ export default function AnalysePage({ resultats }) {
         {/* ── Métriques validation ── */}
         <div>
           <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-2">
-            Métriques de validation — hold-out 30%
+            Métriques de validation — référence JRC Global Surface Water
           </p>
+
+          {m ? (
+            <p className="text-[11px] text-gray-500 mb-2">
+              Calculées sur {m.n_validation} pixels ({m.echantillon}) · Référence : {m.reference}.
+              Indicatif : la référence est en Landsat 30 m, pas un relevé terrain.
+            </p>
+          ) : (
+            <div className="mb-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 leading-relaxed">
+              Métriques non calculables pour cette zone/période : trop peu de pixels d'eau dans la
+              référence JRC (fréquent dans le Ferlo, où les mares sont petites et saisonnières).
+              Essayez une zone avec plus d'eau permanente (Sine-Saloum) ou validez sur des points
+              photo-interprétés.
+            </div>
+          )}
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Card label="Overall Accuracy" value={`${oa}%`} color="text-emerald-600" sub="Pixels bien classés" />
-            <Card label="Kappa de Cohen"   value={k}         color="text-blue-600"   sub="Accord inter-classes" />
-            <Card label="F1-score (eau)"   value={`${f1}%`} color="text-purple-600" sub="Précision × Rappel" />
-            <Card label="Rappel"           value={`${re}%`} color="text-orange-500" sub="Eau bien détectée" />
+            <Card label="Overall Accuracy" value={fmtPct(m?.oa)}   color="text-emerald-600" sub="Pixels bien classés" />
+            <Card label="Kappa de Cohen"   value={m ? m.kappa : NC} color="text-blue-600"   sub="Accord inter-classes" />
+            <Card label="F1-score (eau)"   value={fmtPct(m?.f1)}   color="text-purple-600" sub="Précision × Rappel" />
+            <Card label="Rappel"           value={fmtPct(m?.rappel)} color="text-orange-500" sub="Eau bien détectée" />
           </div>
         </div>
 
@@ -109,7 +123,7 @@ export default function AnalysePage({ resultats }) {
           </div>
         </div>
 
-        {/* ── Importance des variables ── */}
+        {/* ── Importance des variables (RF uniquement) ── */}
         {dataRF.length > 0 && (
           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
             <h2 className="text-sm font-bold text-gray-800">
@@ -129,13 +143,6 @@ export default function AnalysePage({ resultats }) {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-            <div className="mt-4 p-3 bg-emerald-50 border border-emerald-100 rounded-xl
-              text-xs text-emerald-800 leading-relaxed">
-              💡 <strong>Interprétation :</strong> Le MNDWI et le NDWI dominent en zones semi-arides
-              car l'eau y est rare et les contrastes spectraux élevés. Le NDVI aide à distinguer
-              l'eau de la végétation hygrophile. Les bandes SWIR (B11, B12) réduisent les
-              confusions avec les sols humides.
-            </div>
           </div>
         )}
 
@@ -166,48 +173,47 @@ export default function AnalysePage({ resultats }) {
           {/* Matrice de confusion */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
             <h2 className="text-sm font-bold text-gray-800 mb-4">Matrice de confusion</h2>
-            <table className="w-full text-xs">
-              <thead>
-                <tr>
-                  <th className="p-2" />
-                  <th className="p-2 text-center text-gray-500 font-medium bg-gray-50 rounded">Prédit Non-Eau</th>
-                  <th className="p-2 text-center text-gray-500 font-medium bg-gray-50 rounded">Prédit Eau</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="p-2 font-medium text-gray-600">Réel Non-Eau</td>
-                  <td className="p-2 text-center bg-emerald-50 text-emerald-800 font-bold text-base rounded">{M.tn}</td>
-                  <td className="p-2 text-center bg-red-50 text-red-600 rounded">{M.fp}</td>
-                </tr>
-                <tr>
-                  <td className="p-2 font-medium text-gray-600">Réel Eau</td>
-                  <td className="p-2 text-center bg-red-50 text-red-600 rounded">{M.fn}</td>
-                  <td className="p-2 text-center bg-emerald-50 text-emerald-800 font-bold text-base rounded">{M.tp}</td>
-                </tr>
-              </tbody>
-            </table>
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              {[
-                ["Précision",    `${pr}%`, "text-blue-600"  ],
-                ["Spécificité",  `${(M.tn/(M.tn+M.fp)*100).toFixed(1)}%`, "text-purple-600"],
-              ].map(([l,v,c])=>(
-                <div key={l} className="text-center p-2 bg-gray-50 rounded-lg">
-                  <p className={`text-lg font-bold ${c}`}>{v}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">{l}</p>
+            {M ? (
+              <>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr>
+                      <th className="p-2" />
+                      <th className="p-2 text-center text-gray-500 font-medium bg-gray-50 rounded">Prédit Non-Eau</th>
+                      <th className="p-2 text-center text-gray-500 font-medium bg-gray-50 rounded">Prédit Eau</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="p-2 font-medium text-gray-600">Réel Non-Eau</td>
+                      <td className="p-2 text-center bg-emerald-50 text-emerald-800 font-bold text-base rounded">{M.tn}</td>
+                      <td className="p-2 text-center bg-red-50 text-red-600 rounded">{M.fp}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 font-medium text-gray-600">Réel Eau</td>
+                      <td className="p-2 text-center bg-red-50 text-red-600 rounded">{M.fn}</td>
+                      <td className="p-2 text-center bg-emerald-50 text-emerald-800 font-bold text-base rounded">{M.tp}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  {[
+                    ["Précision",   fmtPct(m.precision),   "text-blue-600"  ],
+                    ["Spécificité", fmtPct(m.specificite), "text-purple-600"],
+                  ].map(([l,v,c])=>(
+                    <div key={l} className="text-center p-2 bg-gray-50 rounded-lg">
+                      <p className={`text-lg font-bold ${c}`}>{v}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">{l}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div className="h-40 flex items-center justify-center text-sm text-gray-400 text-center px-4">
+                Matrice non disponible (référence insuffisante)
+              </div>
+            )}
           </div>
-        </div>
-
-        {/* ── Note mémoire ── */}
-        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-xs
-          text-blue-800 leading-relaxed">
-          Un Kappa &gt; 0.80 indique une excellente
-          concordance entre la classification RF et la réalité terrain. Comparez ces métriques
-          avec le seuillage classique NDWI/MNDWI pour démontrer l'apport du Random Forest en
-          zones semi-arides.
         </div>
 
       </div>
