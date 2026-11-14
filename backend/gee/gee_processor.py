@@ -238,6 +238,7 @@ def obtenir_importance(clf):
 
 SEUIL_PERM_HA = 20.0
 SEUIL_TEMP_HA =  2.0
+MAX_POLYGONES = 2000
 
 
 def vectoriser(carte_eau, zone_nom, surface_min_m2=2000):
@@ -398,7 +399,13 @@ def pipeline_detection(
     # 5. Statistiques (1 seul appel)
     print("[5/5] Statistiques (1 appel)...")
     t5 = time.time()
-    geojson = pts_eau.getInfo()
+    tronque = n_points > MAX_POLYGONES
+    if tronque:
+        print(f"  ⚠ {n_points} polygones : seuls les {MAX_POLYGONES} plus grands sont renvoyés")
+        pts_aff = pts_eau.sort("superficie_ha", False).limit(MAX_POLYGONES)
+    else:
+        pts_aff = pts_eau
+    geojson = pts_aff.getInfo()
     sup_tot, sup_moy, sup_max, n_perm, n_temp, n_sec = calculer_stats(pts_eau)
     print(f"       ({time.time()-t5:.1f}s)")
 
@@ -412,6 +419,8 @@ def pipeline_detection(
         "methode": methode_eff,
         "metriques": metriques,
         "n_points_detectes": n_points,
+        "n_points_affiches": min(n_points, MAX_POLYGONES),
+        "tronque": tronque,
         "duree_secondes": duree,
         "geojson": geojson,
         "importance_variables": importance,
