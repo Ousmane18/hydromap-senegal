@@ -175,23 +175,36 @@ NIVEAUX = [
 
 def generer_points_train(image, zone_nom, n_points=N_SAMP):
     zone_t = get_zone_train(zone_nom, rayon_km=30)
+    print(f"  [RF] Entraînement sur buffer 30km ({zone_nom}) — échantillonnage stratifié")
+ 
     for niv in NIVEAUX:
         print(f"  [RF] {niv['label']}...")
-        pts_eau = (image.updateMask(niv["eau"](image))
-                   .sample(region=zone_t, scale=30, numPixels=n_points,
-                           seed=42, geometries=True)
-                   .map(lambda f: f.set(LABEL, 1)))
-        pts_sol = (image.updateMask(niv["sol"](image))
-                   .sample(region=zone_t, scale=30, numPixels=n_points,
-                           seed=99, geometries=True)
-                   .map(lambda f: f.set(LABEL, 0)))
-        n_e = pts_eau.size().getInfo()
-        n_s = pts_sol.size().getInfo()
+        masque_eau = niv["eau"](image)
+        masque_sol = niv["sol"](image)
+ 
+        # Image de classes : 1 = eau, 0 = non-eau, masqué partout ailleurs.
+        # Un pixel présent dans les deux masques est classé « eau ».
+        classes = (ee.Image(0).where(masque_eau, 1)
+                   .updateMask(masque_eau.Or(masque_sol))
+                   .rename(LABEL).toInt())
+ 
+        pts = (image.select(FEATURES_RF).addBands(classes)
+               .stratifiedSample(
+                   numPoints=0, classBand=LABEL, region=zone_t, scale=30,
+                   classValues=[0, 1], classPoints=[n_points, n_points],
+                   seed=42, tileScale=4, geometries=True))
+ 
+        n_e = pts.filter(ee.Filter.eq(LABEL, 1)).size().getInfo()
+        n_s = pts.filter(ee.Filter.eq(LABEL, 0)).size().getInfo()
         print(f"       → {n_e} eau | {n_s} non-eau")
+ 
         if n_e >= N_MIN and n_s >= N_MIN:
-            print(f"  ✓ {niv['label']} validé : {n_e+n_s} points")
-            return pts_eau.merge(pts_sol)
-    raise ValueError("RF : aucun niveau de seuil suffisant.")
+            print(f"  ✓ {niv['label']} validé : {n_e + n_s} points")
+            return pts
+ 
+        print("       → Insuffisant, niveau suivant...")
+ 
+    raise ValueError("RF : aucun niveau de seuil ne fournit assez de pixels des deux classes.")
 
 
 def entrainer_rf(pts_train, n_arbres=100):
