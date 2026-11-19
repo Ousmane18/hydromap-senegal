@@ -141,6 +141,7 @@ FEATURES_RF = [
 LABEL   = "eau"
 N_MIN   = 8
 N_SAMP  = 100
+SEUIL_PROBA_DEFAUT = 0.85
 
 NIVEAUX = [
     {
@@ -219,8 +220,14 @@ def entrainer_rf(pts_train, n_arbres=100):
     return clf
 
 
-def classifier_rf(image, clf):
-    return image.select(FEATURES_RF).classify(clf).rename("eau_rf")
+def classifier_rf(image, clf, seuil_proba=SEUIL_PROBA_DEFAUT):
+    """
+    Le RF est entraîné sur un échantillon équilibré (50 % eau / 50 % non-eau) alors
+    que l'eau est rare : il surestime sa présence. On demande donc la PROBABILITÉ
+    d'eau et on ne garde que les pixels au-dessus du seuil.
+    """
+    proba = image.select(FEATURES_RF).classify(clf.setOutputMode("PROBABILITY"))
+    return proba.gte(seuil_proba).rename("eau_rf")
 
 
 def obtenir_importance(clf):
@@ -321,6 +328,7 @@ def pipeline_detection(
     n_points_train=N_SAMP,
     seuil_ndwi=0.0,
     seuil_mndwi=0.0,
+    seuil_proba=SEUIL_PROBA_DEFAUT,
     nuage_max=50,
     surface_min_m2=2000,
 ) -> dict:
@@ -361,7 +369,7 @@ def pipeline_detection(
         try:
             pts          = generer_points_train(image, zone_nom, n_points_train)
             clf          = entrainer_rf(pts, n_arbres)
-            carte_finale = classifier_rf(image, clf)
+            carte_finale = classifier_rf(image, clf, seuil_proba)
             importance   = obtenir_importance(clf)
         except ValueError as e:
             print(f"  ⚠ RF impossible → fallback AWEI ({e})")
@@ -372,7 +380,7 @@ def pipeline_detection(
         try:
             pts          = generer_points_train(image, zone_nom, n_points_train)
             clf          = entrainer_rf(pts, n_arbres)
-            carte_rf     = classifier_rf(image, clf)
+            carte_rf     = classifier_rf(image, clf, seuil_proba)
             importance   = obtenir_importance(clf)
             carte_finale = carte_rf.And(detection_awei(image)).rename("eau_combinee")
         except ValueError as e:
@@ -418,6 +426,7 @@ def pipeline_detection(
         "periode": f"{date_debut}/{date_fin}",
         "methode": methode_eff,
         "metriques": metriques,
+        "seuil_proba": seuil_proba if methode in ("random_forest", "les_deux") else None,
         "n_points_detectes": n_points,
         "n_points_affiches": min(n_points, MAX_POLYGONES),
         "tronque": tronque,
